@@ -1,0 +1,11 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "isCreatingSolution": true,
+    "environment": "onprem19",
+    "version": "1.10.0",
+    "libraryName": "crudwithreact",
+    "libraryId": "68316b42-a1ec-4271-bcfb-829b6ca4bca2",
+    "packageManager": "npm",
+    "componentType": "webpart"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "crudwithreact-client-side-solution",
+    "id": "68316b42-a1ec-4271-bcfb-829b6ca4bca2",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true
+  },
+  "paths": {
+    "zippedPackage": "solution/crudwithreact.sppkg"
+  }
+}
