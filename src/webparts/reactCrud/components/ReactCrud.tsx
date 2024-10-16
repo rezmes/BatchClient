@@ -10,21 +10,17 @@ import {
   SPHttpClient,
   SPHttpClientConfiguration,
   SPHttpClientResponse,
+  SPHttpClientBatch,
 } from "@microsoft/sp-http";
 
 import {
   TextField,
-  autobind,
   PrimaryButton,
   DetailsList,
   DetailsListLayoutMode,
   CheckboxVisibility,
   SelectionMode,
-  // Dropdown,
   IDropdown,
-  // IDropdownOption,
-  // ITextFieldStyles,
-  // IDropdownStyles,
   DetailsRowCheck,
   Selection,
 } from "office-ui-fabric-react";
@@ -80,17 +76,6 @@ let _softwareListColumns = [
     isResizable: true,
   },
 ];
-
-// // const textFieldStyles: Partial<ITextFieldStyles> = {
-// //   fieldGroup: {
-// //     width: 300,
-// //   },
-// // };
-// // const narrowDropdownStyles: Partial<IDropdownStyles> = {
-// //   fieldGroup: {
-// //     width: 100,
-// //   },
-// // };
 
 const textFieldStyles = { width: 300 };
 const narrowDropdownStyles = { width: 100 };
@@ -224,39 +209,96 @@ export default class ReactCrud extends React.Component<
         }
       });
   };
-  //   //  @autobind;
-  //   // private _onAddClick = () => {
-  //   //   const newItem: ISoftwareListItem = {
-  //   //     Id: this.state.SoftwareListItem.Id,
-  //   //     Title: this.state.SoftwareListItem.Title,
-  //   //     SoftwareName: this.state.SoftwareListItem.SoftwareName,
-  //   //     SoftwareVendor: this.state.SoftwareListItem.SoftwareVendor,
-  //   //     SoftwareDescription: this.state.SoftwareListItem.SoftwareDescription,
-  //   //     SoftwareVersion: this.state.SoftwareListItem.SoftwareVersion,
-  //   //   };
+  //////////////////////////////////////////////////////////////////////////////////////
+  public createAndLoadInOneGo(): Promise<ISoftwareListItem[]> {
+    let promise: Promise<ISoftwareListItem[]> = new Promise<
+      ISoftwareListItem[]
+    >((resolve, reject) => {
+      const clientBatch: SPHttpClientBatch =
+        this.props.context.spHttpClient.beginBatch();
+      const batchOperations: Promise<
+        ISoftwareListItem | ISoftwareListItem[]
+      >[] = [
+        this._addListItemsAsBatch(clientBatch),
+        this._getListItemsAsBatch(clientBatch),
+      ];
+      clientBatch
+        .execute()
+        .then(() => {
+          return Promise.all(batchOperations);
+        })
+        .then((values: any) => {
+          resolve(values[values.length - 1]);
+        })
+        .catch((error: any) => {
+          reject(error);
+        });
+    });
+    return promise;
+  }
 
-  //   //   const url: string = `${this.props.siteUrl}/_api/web/lists/GetByTitle('SoftwareCatalog')/items`;
-  //   //   const spHttpClientOptions: ISPHttpClientOptions = {
-  //   //     body: JSON.stringify(this.state.SoftwareListItem),
-  //   //   };
-  //   //   this.props.context.spHttpClient
-  //   //     .post(url, SPHttpClient.configurations.v1, spHttpClientOptions)
-  //   //     .then((response: SPHttpClientResponse) => {
-  //   //       if (response.status === 201) {
-  //   //         this.bindDetailsList(
-  //   //           "Record added and All Records were loaded Successfully"
-  //   //         );
-  //   //       } else {
-  //   //         let errormessage: string =
-  //   //           "An error has occured i.e. " +
-  //   //           response.status +
-  //   //           " - " +
-  //   //           response.statusText;
-  //   //         this.setState({ status: errormessage });
-  //   //       }
-  //   //     });
-  //   // };
+  private _getListItemsAsBatch(
+    clientBatch: SPHttpClientBatch
+  ): Promise<ISoftwareListItem[]> {
+    const url: string = `${this.props.siteUrl}/_api/web/lists/GetByTitle('SoftwareCatalog')/items`;
+    return clientBatch
+      .get(url, SPHttpClientBatch.configurations.v1)
+      .then((response) => {
+        return response.json();
+      })
+      .then((json) => {
+        return json.value;
+      }) as Promise<ISoftwareListItem[]>;
+  }
 
+  public _addListItemsAsBatch(
+    clientBatch: SPHttpClientBatch
+  ): Promise<ISoftwareListItem> {
+    let promise: Promise<ISoftwareListItem> = new Promise<ISoftwareListItem>(
+      (resolve, reject) => {
+        const url: string = `${this.props.siteUrl}/_api/web/lists/GetByTitle('SoftwareCatalog')/items`;
+
+        const spHttpClientOptions: ISPHttpClientOptions = {
+          body: JSON.stringify(this.state.SoftwareListItem),
+        };
+        clientBatch
+          .post(url, SPHttpClientBatch.configurations.v1, spHttpClientOptions)
+          .then(
+            (response: SPHttpClientResponse): Promise<ISoftwareListItem> => {
+              return response.json();
+            }
+          )
+          .then((softwareListItem: ISoftwareListItem): void => {
+            resolve(softwareListItem);
+          })
+          .catch((error: any) => {
+            reject(error);
+          });
+      }
+    );
+
+    return promise;
+  }
+
+  public btnAddAndLoadInOneGo_Click(): void {
+    const newItem: ISoftwareListItem = {
+      Id: this.state.SoftwareListItem.Id,
+      Title: this.state.SoftwareListItem.Title,
+      SoftwareName: this.state.SoftwareListItem.SoftwareName,
+      SoftwareVendor: this.state.SoftwareListItem.SoftwareVendor,
+      SoftwareDescription: this.state.SoftwareListItem.SoftwareDescription,
+      SoftwareVersion: this.state.SoftwareListItem.SoftwareVersion,
+    };
+    this.createAndLoadInOneGo().then(
+      (softwareListItem: ISoftwareListItem[]) => {
+        this.setState({
+          SoftwareListItems: softwareListItem,
+          status: "Added and Loaded Successfully as one Go",
+        });
+      }
+    );
+  }
+  ////////////////////////////////////////////////////////////////////////////////
   public render(): React.ReactElement<IReactCrudProps> {
     return (
       <div className={styles.reactCrud}>
@@ -363,51 +405,7 @@ export default class ReactCrud extends React.Component<
             this.setState({ SoftwareListItem: newItem });
           }}
         />
-        {/*                <TextField
-          label="ID"
-          required={false}
-          style={textFieldStyles}
-          value={this.state.SoftwareListItem.Id.toString()}
-          onChanged={(e) => {
-            this.state.SoftwareListItem.Id = e;
-          }}
-        />
-         <TextField
-          label="Title"
-          required={true}
-          style={textFieldStyles}
-          value={this.state.SoftwareListItem.Title}
-          onChanged={(e) => {
-            this.state.SoftwareListItem.Title = e;
-          }}
-        />
-        <TextField
-          label="SoftwareName"
-          required={true}
-          style={textFieldStyles}
-          value={this.state.SoftwareListItem.SoftwareName}
-          onChanged={(e) => {
-            this.state.SoftwareListItem.SoftwareName = e;
-          }}
-        />
-        <TextField
-          label="SoftwareVersion"
-          required={true}
-          style={textFieldStyles}
-          value={this.state.SoftwareListItem.SoftwareVersion}
-          onChanged={(e) => {
-            this.state.SoftwareListItem.SoftwareVersion = e;
-          }}
-        />
-        <TextField
-          label="description"
-          required={true}
-          style={textFieldStyles}
-          value={this.state.SoftwareListItem.SoftwareDescription}
-          onChanged={(e) => {
-            this.state.SoftwareListItem.SoftwareDescription = e;
-          }}
-        /> */}
+
         <p className={styles.title}>
           <PrimaryButton text="Add" title="Add" onClick={this._onAddClick} />
           <PrimaryButton
@@ -419,6 +417,11 @@ export default class ReactCrud extends React.Component<
             text="Delete"
             title="Delete"
             onClick={this._onDeleteClick}
+          />
+          <PrimaryButton
+            text="Add &Load In One Go"
+            title="Add"
+            onClick={this.btnAddAndLoadInOneGo_Click}
           />
         </p>
         <div id="divStatus">{this.state.status}</div>
